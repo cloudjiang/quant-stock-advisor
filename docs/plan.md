@@ -2,10 +2,10 @@
 
 **文档角色**：当前唯一主计划（canonical）  
 **更新时间**：`2026-04-29`  
-**当前目标**：月度选股 M7 研究版月度推荐报告；M6 learning-to-rank 已 full-fit 完成  
+**当前目标**：M7 研究版月度推荐报告已完成；下一步进入 regime-aware 复核与推荐集中度治理  
 **研究终点**：每月输出可解释、可回测、PIT-safe 的 Top-K 股票推荐名单  
 **生产状态**：当前无任何研究候选进入生产；`configs/promoted/promoted_registry.json` 继续为空  
-**当前进度**：M0 / M1 / M2 / M3 / M4 / M5 / M6 已完成；下一步进入 M7 月度推荐报告  
+**当前进度**：M0 / M1 / M2 / M3 / M4 / M5 / M6 / M7 已完成；M7 输出研究版 Top-K 推荐名单，不进入生产  
 **归档入口**：`docs/plan-04-20.md` 仅保留 `2026-04-20` 当日执行记录，不再承担主计划职责
 
 ---
@@ -912,6 +912,8 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 
 ### M7：月度推荐报告
 
+**状态**：已完成研究版 full-fit 推荐报告；不进入生产。
+
 目标：
 
 ```text
@@ -934,6 +936,57 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 | `buyability` | 次日可买性 |
 
 推荐名单不是生产持仓，不自动生成交易指令。
+
+当前 M7 已落地：
+
+```text
+scripts/run_monthly_selection_report.py
+tests/test_monthly_selection_report.py
+docs/monthly_selection_m7_recommendation_report_2026-04-29.md
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_summary.json
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_recommendations.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_leaderboard.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_monthly_long.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_rank_ic.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_quantile_spread.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_topk_holdings.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_industry_exposure.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_candidate_pool_width.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_candidate_pool_reject_reason.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_feature_importance.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_feature_contrib.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_feature_coverage.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_risk_summary.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_year_slice.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_regime_slice.csv
+data/results/monthly_selection_m7_recommendation_report_2026-04-29_manifest.json
+```
+
+当前 M7 运行口径：
+
+| 字段 | 当前值 |
+| --- | --- |
+| 输入 dataset | `data/cache/monthly_selection_features.parquet` |
+| 报告信号日 | `2026-03-31` |
+| 下一交易日 | `2026-04-01` |
+| target candidate pool | `U2_risk_sane` |
+| target candidate pass rows | `4196` |
+| model | `M6_xgboost_rank_ndcg` |
+| feature families | `price_volume + industry_breadth + fund_flow + fundamental` |
+| train policy | 使用 `report_signal_date` 前已完成标签月份 full-fit |
+| train months / rows | `62` 个月 / `183061` 行 |
+| top_k | `20 / 30` |
+| production status | `research_only_not_promoted` |
+
+当前 M7 关键结论：
+
+1. 推荐清单已包含 `rank / symbol / name / score / score_percentile / industry / feature_contrib / risk_flags / last_month_rank / buyability` 等 M7 必需字段。
+2. `2026-04-13` 当前没有 `next_trade_date`，因此不是可推荐信号日；M7 自动回退到最新可买信号日 `2026-03-31`，下一交易日为 `2026-04-01`。
+3. 本轮 Top20 / Top30 全部来自 `U2_risk_sane + M6_xgboost_rank_ndcg`，不写入 `configs/promoted/promoted_registry.json`，不生成交易指令。
+4. 历史证据仍引用 M6 watchlist gate：`U2` Top20 after-cost 月均超额约 `0.012106`，Top30 after-cost 月均超额约 `0.008630`；M6 仍未升为生产。
+5. 当前推荐名单行业集中度极高：Top20 / Top30 均为 `非银金融`，这是 M7 后必须优先复核的集中度与 regime-aware 风险，不允许据此直接 promotion。
+6. 数据中没有可靠股票名称源，`name` 暂以 `UNKNOWN` 占位；如后续接入 PIT-safe 名称表，可在 M7 report 层补齐，不改变模型分数。
+7. 下一步应进入 regime-aware calibration、行业集中度约束/披露、以及最新信号日数据完整性修复，而不是把 M7 推荐清单推入生产。
 
 ---
 
@@ -1086,6 +1139,9 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 - `docs/monthly_selection_dataset_2026-04-28.md`
 - `docs/monthly_selection_oracle_2026-04-28.md`
 - `docs/monthly_selection_baselines_2026-04-29.md`
+- `docs/monthly_selection_m5_multisource_full_2026-04-29.md`
+- `docs/monthly_selection_m6_ltr_2026-04-29.md`
+- `docs/monthly_selection_m7_recommendation_report_2026-04-29.md`
 - `data/cache/monthly_selection_features.parquet`
 - `data/results/monthly_selection_dataset_2026-04-28_quality.csv`
 - `data/results/monthly_selection_dataset_2026-04-28_candidate_pool_width.csv`
@@ -1105,6 +1161,15 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 - `data/results/monthly_selection_baselines_2026-04-29_topk_holdings.csv`
 - `data/results/monthly_selection_baselines_2026-04-29_industry_exposure.csv`
 - `data/results/monthly_selection_baselines_2026-04-29_feature_importance.csv`
+- `data/results/monthly_selection_m5_multisource_full_2026-04-29_summary.json`
+- `data/results/monthly_selection_m5_multisource_full_2026-04-29_leaderboard.csv`
+- `data/results/monthly_selection_m5_multisource_full_2026-04-29_feature_importance.csv`
+- `data/results/monthly_selection_m6_ltr_2026-04-29_summary.json`
+- `data/results/monthly_selection_m6_ltr_2026-04-29_leaderboard.csv`
+- `data/results/monthly_selection_m6_ltr_2026-04-29_vs_m5_gate.csv`
+- `data/results/monthly_selection_m7_recommendation_report_2026-04-29_summary.json`
+- `data/results/monthly_selection_m7_recommendation_report_2026-04-29_recommendations.csv`
+- `data/results/monthly_selection_m7_recommendation_report_2026-04-29_manifest.json`
 
 ### 新数据质量
 
@@ -1124,9 +1189,15 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 - `scripts/run_monthly_selection_dataset.py`
 - `scripts/run_monthly_selection_oracle.py`
 - `scripts/run_monthly_selection_baselines.py`
+- `scripts/run_monthly_selection_multisource.py`
+- `scripts/run_monthly_selection_ltr.py`
+- `scripts/run_monthly_selection_report.py`
 - `tests/test_monthly_selection_dataset.py`
 - `tests/test_monthly_selection_oracle.py`
 - `tests/test_monthly_selection_baselines.py`
+- `tests/test_monthly_selection_multisource.py`
+- `tests/test_monthly_selection_ltr.py`
+- `tests/test_monthly_selection_report.py`
 - `src/models/xtree/p1_workflow.py`
 - `src/features/tensor_base_factors.py`
 - `src/features/intraday_proxy_factors.py`
@@ -1140,4 +1211,4 @@ data/results/monthly_selection_m6_ltr_2026-04-29_manifest.json
 
 ## 12. 当前一句话路线
 
-**项目主线已从“量化持仓 replacement”切换为“量化月度选股”：M1 多源数据质量修复、M2 月度截面特征与标签表、M3 oracle top-bucket 诊断、M4 baseline ranker、M5 多源特征扩展均已完成第一版；`U1_liquid_tradable` 候选池存在很强事后上限，M5 显示 industry breadth + selected fundamental 可提高 Top-K 超额与保持正 Rank IC，但 fund flow / shareholder 仍受覆盖约束，强市参与度仍需修复；下一步进入 M6 learning-to-rank / top-bucket calibration，生产 promoted registry 继续为空。**
+**项目主线已从“量化持仓 replacement”切换为“量化月度选股”：M1 多源数据质量修复、M2 月度截面特征与标签表、M3 oracle top-bucket 诊断、M4 baseline ranker、M5 多源特征扩展、M6 learning-to-rank watchlist 与 M7 研究版推荐报告均已完成；当前 M7 输出 `U2_risk_sane + M6_xgboost_rank_ndcg` 的 Top20/Top30 研究名单，但行业集中度极高且仍未 promotion；下一步优先做 regime-aware calibration、行业集中度约束/披露与最新信号日可买性数据完整性修复，生产 promoted registry 继续为空。**

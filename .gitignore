@@ -46,8 +46,6 @@ data/
 *.duckdb.wal
 
 # —— 密钥与本地覆盖配置 ——
-.env
-.env.*
 !.env.example
 secrets.yaml
 config.local.yaml
@@ -62,3 +60,5 @@ Thumbs.db
 
 # —— 日志（若将来有仓库根目录下的日志）——
 *.log
+config.bat
+node_modules
